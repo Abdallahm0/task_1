@@ -8,12 +8,19 @@ import 'screens/auth_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(
-    BlocProvider(
+  runApp(const AppRoot());
+}
+
+class AppRoot extends StatelessWidget {
+  const AppRoot({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
       create: (_) => WeatherCubit(WeatherRepositoryImpl()),
       child: const MyApp(),
-    ),
-  );
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -28,6 +35,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
+      // showPerformanceOverlay: true, // Uncomment for performance debugging
       initialRoute: '/',
       routes: {'/': (context) => const AuthScreen()},
     );

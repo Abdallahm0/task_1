@@ -37,14 +37,19 @@ class WeatherApi {
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      // The forecast day is in data['forecast']['forecastday'][0]['day']['avgtemp_c']
-      final forecastDay = data['forecast']?['forecastday']?[0]?['day'];
-      if (forecastDay != null && forecastDay['avgtemp_c'] != null) {
-        return (forecastDay['avgtemp_c'] as num).toDouble();
+      final forecastDays = data['forecast']?['forecastday'];
+      if (forecastDays != null &&
+          forecastDays is List &&
+          forecastDays.isNotEmpty) {
+        final forecastDay = forecastDays[0]['day'];
+        if (forecastDay != null && forecastDay['avgtemp_c'] != null) {
+          return (forecastDay['avgtemp_c'] as num).toDouble();
+        }
       }
+      // If no forecast data is available for the date
       return null;
     } else {
-      print('Forecast Status: ${response.statusCode}');
+      print('Forecast Status:  [33m${response.statusCode}\u001b[0m');
       print('Forecast Body: ${response.body}');
       throw Exception('Failed to load forecast data');
     }
