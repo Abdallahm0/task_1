@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:task_1/screens/home_screen.dart';
 import 'package:task_1/screens/signup_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+// import 'package:weather_app/presentation/cubit/weather_cubit.dart';
+// import 'package:weather_app/data/repositories/weather_repository_impl.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -12,6 +16,12 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   TextEditingController emailController = TextEditingController();
   TextEditingController passController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Removed WeatherCubit call and undefined variables
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,6 +182,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           Navigator.of(context).pop();
                         }
 
+                        // Navigate to HomeScreen
+                        if (context.mounted) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HomeScreen(),
+                            ),
+                          );
+                        }
+
                         // Show success message only
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -257,7 +277,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const SignupScreen(),
+                        builder: (context) => const HomeScreen(),
                       ),
                     );
                   },
