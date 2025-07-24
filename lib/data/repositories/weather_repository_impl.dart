@@ -21,4 +21,13 @@ class WeatherRepositoryImpl implements WeatherRepository {
   Future<PredictionResult> predictTrainingSuitability(List<int> features) {
     return AIModelApi.predictTrainingSuitability(features);
   }
+
+  @override
+  Future<CurrentWeatherModel?> getForecastWeather(
+    double lat,
+    double lon,
+    DateTime date,
+  ) {
+    return WeatherApi.fetchForecastWeather(lat: lat, lon: lon, date: date);
+  }
 }

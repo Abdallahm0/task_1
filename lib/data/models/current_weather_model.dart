@@ -73,6 +73,10 @@ class Current {
   final double tempF;
   final int isDay;
   final int humidity;
+  final double windKph;
+  final int cloud;
+  final double precipMm;
+  final double uv;
   final Condition condition;
 
   Current({
@@ -82,6 +86,10 @@ class Current {
     required this.tempF,
     required this.isDay,
     required this.humidity,
+    required this.windKph,
+    required this.cloud,
+    required this.precipMm,
+    required this.uv,
     required this.condition,
   });
 
@@ -93,6 +101,10 @@ class Current {
       tempF: json['temp_f'].toDouble(),
       isDay: json['is_day'],
       humidity: json['humidity'],
+      windKph: (json['wind_kph'] ?? 0).toDouble(),
+      cloud: json['cloud'] ?? 0,
+      precipMm: (json['precip_mm'] ?? 0).toDouble(),
+      uv: (json['uv'] ?? 0).toDouble(),
       condition: Condition.fromJson(json['condition']),
     );
   }
@@ -105,6 +117,10 @@ class Current {
       'temp_f': tempF,
       'is_day': isDay,
       'humidity': humidity,
+      'wind_kph': windKph,
+      'cloud': cloud,
+      'precip_mm': precipMm,
+      'uv': uv,
       'condition': condition.toJson(),
     };
   }

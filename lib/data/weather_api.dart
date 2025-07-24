@@ -54,4 +54,52 @@ class WeatherApi {
       throw Exception('Failed to load forecast data');
     }
   }
+
+  static Future<CurrentWeatherModel?> fetchForecastWeather({
+    required double lat,
+    required double lon,
+    required DateTime date,
+  }) async {
+    final dateString =
+        '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final url =
+        '$forecastUrl?key=$apiKey&q=$lat,$lon&dt=$dateString&aqi=no&alerts=no';
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final location = data['location'];
+      final forecastDays = data['forecast']?['forecastday'];
+      if (forecastDays != null &&
+          forecastDays is List &&
+          forecastDays.isNotEmpty) {
+        final forecastDay = forecastDays[0];
+        final day = forecastDay['day'];
+        if (day != null) {
+          // Build a CurrentWeatherModel from forecast day data
+          final current = {
+            'last_updated_epoch': forecastDay['date_epoch'],
+            'last_updated': forecastDay['date'],
+            'temp_c': day['avgtemp_c'],
+            'temp_f': day['avgtemp_f'],
+            'is_day': 1,
+            'humidity': day['avghumidity'],
+            'wind_kph': day['maxwind_kph'],
+            'cloud': day['daily_chance_of_rain'] ?? 0,
+            'precip_mm': day['totalprecip_mm'],
+            'uv': day['uv'],
+            'condition': day['condition'],
+          };
+          return CurrentWeatherModel.fromJson({
+            'location': location,
+            'current': current,
+          });
+        }
+      }
+      return null;
+    } else {
+      print('Forecast Status:  [33m${response.statusCode}\u001b[0m');
+      print('Forecast Body: ${response.body}');
+      throw Exception('Failed to load forecast data');
+    }
+  }
 }

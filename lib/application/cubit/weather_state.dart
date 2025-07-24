@@ -25,6 +25,17 @@ class WeatherError extends WeatherState {
   WeatherError(this.message);
 }
 
+class WeatherRefreshing extends WeatherState {
+  final CurrentWeatherModel currentWeather;
+  final DateTime? selectedDate;
+  final PredictionResult? predictionResult;
+  WeatherRefreshing({
+    required this.currentWeather,
+    this.selectedDate,
+    this.predictionResult,
+  });
+}
+
 class PredictionLoading extends WeatherState {}
 
 class PredictionLoaded extends WeatherState {

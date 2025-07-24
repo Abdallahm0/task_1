@@ -54,348 +54,280 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Automatically trigger prediction when weather data changes and predictionResult is null
     return BlocBuilder<WeatherCubit, WeatherState>(
       builder: (context, state) {
+        if (state is WeatherLoaded && state.predictionResult == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.read<WeatherCubit>().predictTrainingSuitability(
+              state.currentWeather,
+            );
+          });
+        }
         return LayoutBuilder(
           builder: (context, constraints) {
             final isWide = constraints.maxWidth > 600;
-            if (state is WeatherLoading) {
+            if (state is WeatherLoading || state is PredictionLoading) {
               return const Center(child: CircularProgressIndicator());
             } else if (state is WeatherError) {
               return Center(child: Text('Error: ${state.message}'));
-            } else if (state is PredictionLoading) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (state is PredictionError) {
-              return Center(child: Text('Prediction error: ${state.message}'));
-            } else if (state is PredictionLoaded) {
-              final result = state.result;
-              // 
-              
+            } else if (state is WeatherRefreshing ||
+                state is WeatherLoaded ||
+                state is PredictionLoaded) {
+              final currentWeather = (state is WeatherLoaded)
+                  ? state.currentWeather
+                  : (state is WeatherRefreshing)
+                  ? (state as WeatherRefreshing).currentWeather
+                  : (state is PredictionLoaded)
+                  ? (state as PredictionLoaded).currentWeather
+                  : null;
+              final predictionResult = state is WeatherLoaded
+                  ? state.predictionResult
+                  : (state is WeatherRefreshing)
+                  ? (state as WeatherRefreshing).predictionResult
+                  : (state is PredictionLoaded)
+                  ? (state as PredictionLoaded).result
+                  : null;
+              final forecastTemp = state is WeatherLoaded
+                  ? state.forecastTempC
+                  : null;
+              final selectedDate = state is WeatherLoaded
+                  ? (state.selectedDate ?? _selectedDate)
+                  : (state is WeatherRefreshing)
+                  ? (state as WeatherRefreshing).selectedDate ?? _selectedDate
+                  : _selectedDate;
+              final userEmail =
+                  FirebaseAuth.instance.currentUser?.email ?? 'Not logged in';
               return Scaffold(
-                body: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        result.isSuitable
-                            ? 'Weather is perfect for training!'
-                            : 'Weather is NOT suitable for training.',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: result.isSuitable ? Colors.green : Colors.red,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      if (result.message != null)
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(result.message!),
-                        ),
-                      ElevatedButton(
-                        onPressed: () {
-                          context.read<WeatherCubit>().loadCurrentWeather(
-                            _defaultLat,
-                            _defaultLon,
-                          );
-                        },
-                        child: const Text('Back to Weather'),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            } else if (state is WeatherLoaded) {
-              final weather = state.currentWeather;
-              final forecastTemp = state.forecastTempC;
-              final selectedDate = state.selectedDate ?? _selectedDate;
-              final predictionResult = state.predictionResult;
-              return Scaffold(
-                body: Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  color: Colors.indigo, // Fill background
-                  child: SafeArea(
+                backgroundColor: Colors.indigo[900],
+                body: SafeArea(
+                  child: SingleChildScrollView(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isWide ? constraints.maxWidth * 0.2 : 8.0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0,
                         vertical: 8.0,
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: ListView(
+                          if (state is WeatherRefreshing)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: LinearProgressIndicator(
+                                backgroundColor: Colors.indigo[700],
+                                color: Colors.orange,
+                              ),
+                            ),
+                          // Calendar at the top
+                          TableCalendar(
+                            firstDay: DateTime.now().subtract(
+                              Duration(days: 365),
+                            ),
+                            lastDay: DateTime.now().add(Duration(days: 365)),
+                            focusedDay: _focusedDay,
+                            selectedDayPredicate: (day) =>
+                                isSameDay(selectedDate, day),
+                            onDaySelected: (selectedDay, focusedDay) async {
+                              setState(() {
+                                _selectedDate = selectedDay;
+                                _focusedDay = focusedDay;
+                              });
+                              context.read<WeatherCubit>().loadForecast(
+                                currentWeather?.location.lat ?? _defaultLat,
+                                currentWeather?.location.lon ?? _defaultLon,
+                                selectedDay,
+                              );
+                            },
+                            headerVisible: false,
+                            calendarFormat: CalendarFormat.week,
+                            daysOfWeekVisible: true,
+                            calendarStyle: CalendarStyle(
+                              todayDecoration: BoxDecoration(
+                                color: Colors.deepPurple,
+                                shape: BoxShape.circle,
+                              ),
+                              selectedDecoration: BoxDecoration(
+                                color: Colors.orange,
+                                shape: BoxShape.circle,
+                              ),
+                              selectedTextStyle: TextStyle(color: Colors.white),
+                              weekendTextStyle: TextStyle(
+                                color: Colors.white70,
+                              ),
+                              defaultTextStyle: TextStyle(color: Colors.white),
+                              outsideTextStyle: TextStyle(
+                                color: Colors.white38,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 10),
+                          // User info, location, date/time
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    currentWeather?.location.name ??
+                                        'Loading...',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    currentWeather?.location.localtime ??
+                                        'Loading...',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  Text(
+                                    userEmail,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.white54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.location_on,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                                onPressed: () async {
+                                  try {
+                                    Position pos = await _determinePosition();
+                                    context
+                                        .read<WeatherCubit>()
+                                        .loadCurrentWeather(
+                                          pos.latitude,
+                                          pos.longitude,
+                                        );
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Location error: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 18),
+                          // Weather info grid
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 32),
+                            child: Wrap(
+                              spacing: 16,
+                              runSpacing: 16,
                               children: [
-                                Container(
-                                  padding: EdgeInsets.all(isWide ? 32 : 12),
-                                  color: Colors.indigo,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                weather.location.name,
-                                                style: TextStyle(
-                                                  fontSize: isWide ? 32 : 22,
-                                                  fontWeight: FontWeight.w400,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              Text(
-                                                weather.location.localtime,
-                                                style: TextStyle(
-                                                  fontSize: isWide ? 20 : 16,
-                                                  fontWeight: FontWeight.w400,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              Text(
-                                                FirebaseAuth
-                                                        .instance
-                                                        .currentUser
-                                                        ?.email ??
-                                                    'Not logged in',
-                                                style: TextStyle(
-                                                  fontSize: isWide ? 16 : 14,
-                                                  fontWeight: FontWeight.w400,
-                                                  color: Colors.white70,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          IconButton(
-                                            icon: Icon(
-                                              Icons.location_on,
-                                              color: Colors.white,
-                                              size: isWide ? 36 : 24,
-                                            ),
-                                            onPressed: () async {
-                                              try {
-                                                Position pos =
-                                                    await _determinePosition();
-                                                context
-                                                    .read<WeatherCubit>()
-                                                    .loadCurrentWeather(
-                                                      pos.latitude,
-                                                      pos.longitude,
-                                                    );
-                                              } catch (e) {
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Location error: $e',
-                                                    ),
-                                                    backgroundColor: Colors.red,
-                                                  ),
-                                                );
-                                              }
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: isWide ? 40 : 20),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Transform.scale(
-                                            scale: isWide ? 2.0 : 1.6,
-                                            child: Image.network(
-                                              'https:${weather.current.condition.icon}',
-                                              errorBuilder:
-                                                  (
-                                                    context,
-                                                    error,
-                                                    stackTrace,
-                                                  ) => Icon(
-                                                    Icons.cloud,
-                                                    size: isWide ? 120 : 80,
-                                                    color: Colors.white,
-                                                  ),
-                                            ),
-                                          ),
-                                          SizedBox(width: isWide ? 32 : 10),
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                weather.current.tempC
-                                                    .toStringAsFixed(1),
-                                                style: TextStyle(
-                                                  fontSize: isWide ? 90 : 65,
-                                                  fontWeight: FontWeight.w300,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              Text(
-                                                "°C",
-                                                style: TextStyle(
-                                                  fontSize: isWide ? 40 : 30,
-                                                  fontWeight: FontWeight.w400,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              Text(
-                                                weather.current.condition.text,
-                                                style: TextStyle(
-                                                  fontSize: isWide ? 28 : 22,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              Text(
-                                                "Last updated:  ${weather.current.lastUpdated}",
-                                                style: TextStyle(
-                                                  fontSize: isWide ? 18 : 15,
-                                                  fontWeight: FontWeight.w400,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: isWide ? 32 : 20),
-                                      Center(
-                                        child: ElevatedButton(
-                                          onPressed: () {
-                                            context
-                                                .read<WeatherCubit>()
-                                                .predictTrainingSuitability(
-                                                  weather,
-                                                );
-                                          },
-                                          child: const Text(
-                                            'Check if Weather is Perfect for Training',
-                                          ),
-                                        ),
-                                      ),
-                                      if (predictionResult != null)
-                                        Padding(
-                                          padding: const EdgeInsets.all(12.0),
-                                          child: Text(
-                                            predictionResult.isSuitable
-                                                ? 'Weather is perfect for training!'
-                                                : 'Weather is NOT suitable for training.',
-                                            style: TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.bold,
-                                              color: predictionResult.isSuitable
-                                                  ? Colors.green
-                                                  : Colors.red,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                      TableCalendar(
-                                        firstDay: DateTime.now().subtract(
-                                          Duration(days: 365),
-                                        ),
-                                        lastDay: DateTime.now().add(
-                                          Duration(days: 365),
-                                        ),
-                                        focusedDay: _focusedDay,
-                                        selectedDayPredicate: (day) =>
-                                            isSameDay(selectedDate, day),
-                                        onDaySelected:
-                                            (selectedDay, focusedDay) async {
-                                              setState(() {
-                                                _selectedDate = selectedDay;
-                                                _focusedDay = focusedDay;
-                                              });
-                                              context
-                                                  .read<WeatherCubit>()
-                                                  .loadForecast(
-                                                    weather.location.lat,
-                                                    weather.location.lon,
-                                                    selectedDay,
-                                                  );
-                                            },
-                                        headerVisible: true,
-                                        headerStyle: HeaderStyle(
-                                          formatButtonVisible: false,
-                                        ),
-                                        calendarFormat: CalendarFormat.month,
-                                        calendarStyle: CalendarStyle(
-                                          todayDecoration: BoxDecoration(
-                                            color: Colors.indigo,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          selectedDecoration: BoxDecoration(
-                                            color: Colors.deepPurple,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          selectedTextStyle: TextStyle(
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                      if (selectedDate != null &&
-                                          forecastTemp != null)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: 12.0,
-                                          ),
-                                          child: Text(
-                                            'Expected temperature on ${selectedDate!.toLocal().toString().split(' ')[0]}: ${forecastTemp!.toStringAsFixed(1)} °C',
-                                            style: TextStyle(
-                                              fontSize: isWide ? 22 : 18,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
+                                SizedBox(
+                                  width:
+                                      (MediaQuery.of(context).size.width - 40) /
+                                      2, // 2 columns, adjust for padding/margin
+                                  child: _WeatherInfoCard(
+                                    icon: Icons.thermostat,
+                                    label: 'Temperature',
+                                    value: currentWeather != null
+                                        ? '${currentWeather.current.tempC.toStringAsFixed(1)}°C'
+                                        : '-',
                                   ),
                                 ),
-                                SizedBox(height: 10),
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      _InfoCard(
-                                        label: "Region",
-                                        value:
-                                            weather.location.region.isNotEmpty
-                                            ? weather.location.region
-                                            : "N/A",
-                                        icon: Icons.map,
-                                        isWide: isWide,
-                                      ),
-                                      _InfoCard(
-                                        label: "Country",
-                                        value: weather.location.country,
-                                        icon: Icons.flag,
-                                        isWide: isWide,
-                                      ),
-                                      _InfoCard(
-                                        label: "Lat/Lon",
-                                        value:
-                                            "${weather.location.lat.toStringAsFixed(2)}, ${weather.location.lon.toStringAsFixed(2)}",
-                                        icon: Icons.location_searching,
-                                        isWide: isWide,
-                                      ),
-                                    ],
+                                SizedBox(
+                                  width:
+                                      (MediaQuery.of(context).size.width - 40) /
+                                      2, // 2 columns, adjust for padding/margin
+                                  child: _WeatherInfoCard(
+                                    icon: Icons.air,
+                                    label: 'Wind Speed',
+                                    value: currentWeather != null
+                                        ? '${(currentWeather.current.windKph / 3.6).toStringAsFixed(1)} m/s'
+                                        : '-',
+                                  ),
+                                ),
+                                SizedBox(
+                                  width:
+                                      (MediaQuery.of(context).size.width - 40) /
+                                      2, // 2 columns, adjust for padding/margin
+                                  child: _WeatherInfoCard(
+                                    icon: Icons.cloud,
+                                    label: 'Cloud Cover',
+                                    value: currentWeather != null
+                                        ? '${currentWeather.current.cloud}%'
+                                        : '-',
+                                  ),
+                                ),
+                                SizedBox(
+                                  width:
+                                      (MediaQuery.of(context).size.width - 40) /
+                                      2, // 2 columns, adjust for padding/margin
+                                  child: _WeatherInfoCard(
+                                    icon: Icons.opacity,
+                                    label: 'Humidity',
+                                    value: currentWeather != null
+                                        ? '${currentWeather.current.humidity}%'
+                                        : '-',
+                                  ),
+                                ),
+                                SizedBox(
+                                  width:
+                                      (MediaQuery.of(context).size.width - 40) /
+                                      2, // 2 columns, adjust for padding/margin
+                                  child: _WeatherInfoCard(
+                                    icon: Icons.grain,
+                                    label: 'Precipitation',
+                                    value: currentWeather != null
+                                        ? '${currentWeather.current.precipMm.toStringAsFixed(1)} mm'
+                                        : '-',
+                                  ),
+                                ),
+                                SizedBox(
+                                  width:
+                                      (MediaQuery.of(context).size.width - 40) /
+                                      2, // 2 columns, adjust for padding/margin
+                                  child: _WeatherInfoCard(
+                                    icon: Icons.wb_sunny,
+                                    label: 'UV Index',
+                                    value: currentWeather != null
+                                        ? '${currentWeather.current.uv}'
+                                        : '-',
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.only(bottom: 40),
+                                  child: SizedBox(
+                                    width:
+                                        (MediaQuery.of(context).size.width -
+                                            40) /
+                                        2, // 2 columns, adjust for padding/margin
+                                    child: _WeatherInfoCard(
+                                      icon: Icons.sports_tennis,
+                                      label: 'Tennis Status',
+                                      value:
+                                          (predictionResult != null &&
+                                              predictionResult.isSuitable)
+                                          ? 'Recommended'
+                                          : 'Not Recommended',
+                                      valueColor:
+                                          (predictionResult != null &&
+                                              predictionResult.isSuitable)
+                                          ? Colors.green
+                                          : Colors.red,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                          SizedBox(height: 16),
                         ],
                       ),
                     ),
@@ -412,60 +344,43 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _InfoCard extends StatelessWidget {
+class _WeatherInfoCard extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
-  final IconData icon;
-  final bool isWide;
-  const _InfoCard({
+  final Color? valueColor;
+  const _WeatherInfoCard({
+    required this.icon,
     required this.label,
     required this.value,
-    required this.icon,
-    required this.isWide,
+    this.valueColor,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        color: Colors.indigo,
+        color: Colors.indigo[800],
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
+        ],
       ),
-      padding: EdgeInsets.all(isWide ? 20 : 15),
+      padding: EdgeInsets.all(16),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: EdgeInsets.all(3.0),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(50),
-                color: Colors.white,
-              ),
-              padding: EdgeInsets.all(isWide ? 14.0 : 10.0),
-              child: Icon(icon, color: Colors.indigo, size: isWide ? 32 : 24),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(3.0),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: isWide ? 18 : 15,
-                fontWeight: FontWeight.w400,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(3.0),
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: isWide ? 24 : 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+          Icon(icon, color: Colors.white, size: 32),
+          SizedBox(height: 12),
+          Text(label, style: TextStyle(color: Colors.white70, fontSize: 15)),
+          SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: valueColor ?? Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
