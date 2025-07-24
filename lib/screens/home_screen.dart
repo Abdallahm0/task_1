@@ -7,6 +7,8 @@ import '../application/cubit/weather_cubit.dart';
 import '../application/cubit/weather_state.dart';
 import '../data/repositories/weather_repository_impl.dart';
 import '../domain/repositories/weather_repository.dart';
+import '../data/models/prediction_result.dart';
+import '../data/models/current_weather_model.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -61,10 +63,53 @@ class _HomeScreenState extends State<HomeScreen> {
               return const Center(child: CircularProgressIndicator());
             } else if (state is WeatherError) {
               return Center(child: Text('Error: ${state.message}'));
+            } else if (state is PredictionLoading) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (state is PredictionError) {
+              return Center(child: Text('Prediction error: ${state.message}'));
+            } else if (state is PredictionLoaded) {
+              final result = state.result;
+              // 
+              
+              return Scaffold(
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        result.isSuitable
+                            ? 'Weather is perfect for training!'
+                            : 'Weather is NOT suitable for training.',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: result.isSuitable ? Colors.green : Colors.red,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (result.message != null)
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(result.message!),
+                        ),
+                      ElevatedButton(
+                        onPressed: () {
+                          context.read<WeatherCubit>().loadCurrentWeather(
+                            _defaultLat,
+                            _defaultLon,
+                          );
+                        },
+                        child: const Text('Back to Weather'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
             } else if (state is WeatherLoaded) {
               final weather = state.currentWeather;
               final forecastTemp = state.forecastTempC;
               final selectedDate = state.selectedDate ?? _selectedDate;
+              final predictionResult = state.predictionResult;
               return Scaffold(
                 body: Container(
                   width: double.infinity,
@@ -224,6 +269,37 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ],
                                       ),
                                       SizedBox(height: isWide ? 32 : 20),
+                                      Center(
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            context
+                                                .read<WeatherCubit>()
+                                                .predictTrainingSuitability(
+                                                  weather,
+                                                );
+                                          },
+                                          child: const Text(
+                                            'Check if Weather is Perfect for Training',
+                                          ),
+                                        ),
+                                      ),
+                                      if (predictionResult != null)
+                                        Padding(
+                                          padding: const EdgeInsets.all(12.0),
+                                          child: Text(
+                                            predictionResult.isSuitable
+                                                ? 'Weather is perfect for training!'
+                                                : 'Weather is NOT suitable for training.',
+                                            style: TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.bold,
+                                              color: predictionResult.isSuitable
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
                                       TableCalendar(
                                         firstDay: DateTime.now().subtract(
                                           Duration(days: 365),

@@ -2,6 +2,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/models/current_weather_model.dart';
 import '../../domain/repositories/weather_repository.dart';
 import 'weather_state.dart';
+import '../../data/feature_mapper.dart';
+import '../../data/models/prediction_result.dart';
 
 class WeatherCubit extends Cubit<WeatherState> {
   final WeatherRepository repository;
@@ -31,6 +33,17 @@ class WeatherCubit extends Cubit<WeatherState> {
       );
     } catch (e) {
       emit(WeatherError(e.toString()));
+    }
+  }
+
+  Future<void> predictTrainingSuitability(CurrentWeatherModel weather) async {
+    emit(PredictionLoading());
+    try {
+      final features = FeatureMapper.mapWeatherToFeatures(weather);
+      final result = await repository.predictTrainingSuitability(features);
+      emit(PredictionLoaded(result, weather));
+    } catch (e) {
+      emit(PredictionError(e.toString()));
     }
   }
 }

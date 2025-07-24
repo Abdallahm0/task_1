@@ -72,6 +72,7 @@ class Current {
   final double tempC;
   final double tempF;
   final int isDay;
+  final int humidity;
   final Condition condition;
 
   Current({
@@ -80,6 +81,7 @@ class Current {
     required this.tempC,
     required this.tempF,
     required this.isDay,
+    required this.humidity,
     required this.condition,
   });
 
@@ -90,6 +92,7 @@ class Current {
       tempC: json['temp_c'].toDouble(),
       tempF: json['temp_f'].toDouble(),
       isDay: json['is_day'],
+      humidity: json['humidity'],
       condition: Condition.fromJson(json['condition']),
     );
   }
@@ -101,6 +104,7 @@ class Current {
       'temp_c': tempC,
       'temp_f': tempF,
       'is_day': isDay,
+      'humidity': humidity,
       'condition': condition.toJson(),
     };
   }
